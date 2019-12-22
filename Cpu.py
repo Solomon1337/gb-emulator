@@ -3,21 +3,21 @@ from Memory import Memory
 
 class Registers():
     def __init__(self):
-        self.A = 0x00
-        self.B = 0x00
-        self.C = 0x00
-        self.D = 0x00
-        self.E = 0x00
-        self.H = 0x00
-        self.L = 0x00
+        self.A = 0x0000
+        self.B = 0x0000
+        self.C = 0x0000
+        self.D = 0x0000
+        self.E = 0x0000
+        self.H = 0x0000
+        self.L = 0x0000
 
-        self.AF = 0x00
-        self.BC = 0x00
-        self.DE = 0x00
-        self.HL = 0x00
+        self.AF = 0x0000
+        self.BC = 0x0000
+        self.DE = 0x0000
+        self.HL = 0x0000
 
-        self.SP = 0x00
-        self.PC = 0x00
+        self.SP = 0x0000
+        self.PC = 0x0100
 
 
 class Opcode():
@@ -31,11 +31,20 @@ class Cpu():
     def __init__(self):
         self.register = Registers()
 
+    def load_bn(self, n):
+        self.register.B = n
 
-class Commands():
+    def load_cn(self, n):
+        self.register.C = n
 
-    def load_bn(n):
-        self.B = n
+    def load_dn(self, n):
+        self.register.D = n
 
-    def load_cn(n):
-        self.C = n
+    def load_en(self, n):
+        self.register.E = n
+
+    def load_hn(self, n):
+        self.register.H = n
+
+    def load_ln(self, n):
+        self.register.L = n
