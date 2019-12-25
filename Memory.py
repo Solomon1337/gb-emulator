@@ -39,6 +39,15 @@ class Memory():
         # self.mem = bytearray(0xffff)
         self.mem = [0]*65535
 
+    def load_bios_rom(self):
+        self.mem[0:0x100] = Memory.bios
+
+    def load_rom_bank_0(self, bank):
+        self.mem[0:0x4000] = bank
+
+    def load_rom_bank_n(self, bank):
+        self.mem[0x4000:0x8000] = bank
+
     def read(self, location):
         if location > 0xffff or location < 0x0000:
             raise Exception("location " + location + " out of range!")

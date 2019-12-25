@@ -1,4 +1,13 @@
 
+class GBType():
+    types = {
+        0: "GB",
+        1: "GBP",
+        2: "SGB",
+        3: "GBC"
+    }
+
+
 class Rom():
     def __init__(self, binarydata):
         self.binarydata = binarydata
@@ -36,3 +45,12 @@ class Rom():
 
     def get_title(self):
         return ''.join([chr(f) for f in self.title])
+
+    def get_gb_type(self):
+        if self.color_gb == 0x80:
+            return GBType.types[3]
+        elif self.gb_sgb == 0x03:
+            return GBType.types[2]
+        elif self.gb_sgb == 0x00:
+            return GBType.types[0]
+        return GBType.types[1]

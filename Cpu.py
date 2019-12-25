@@ -17,7 +17,24 @@ class Registers():
         self.HL = 0x0000
 
         self.SP = 0x0000
-        self.PC = 0x0100
+        self.PC = 0x0000
+
+        self.flag = {
+            "Z": 0,
+            "N": 0,
+            "H": 0,
+            "C": 0
+        }
+
+    def set_starting_values(self):
+        self.AF = 0x01 #Für GB Typ anpassen
+        self.AF += 0xb0
+
+        self.BC = 0x0013
+        self.DE = 0x00d8
+        self.HL = 0x014d
+        
+        self.SP = 0xfffe
 
 
 class Stack():
@@ -65,7 +82,7 @@ class Cpu():
             0x7b: Opcode("LD A,E", 1, 4, self.ld_a_e),
             0x7c: Opcode("LD A,H", 1, 4, self.ld_a_h),
             0x7d: Opcode("LD A,L", 1, 4, self.ld_a_l),
-            0xe2: Opcode("LD (C),A", 2, 8, self.ld_c_a),
+            0xe2: Opcode("LD (C),A", 1, 8, self.ld_c_a),
             0xea: Opcode("LD (a16),A", 3, 16, self.ld_a16_a),
             0xe0: Opcode("LDH (a8),A", 2, 12, self.ldh_a8_a),
             0xf0: Opcode("LDH A,(a8)", 2, 12, self.ldh_a_a8),
@@ -98,11 +115,22 @@ class Cpu():
             0xfe: Opcode("CP d8", 2, 8, self.cp_d8),
             
 
-
             0xcb7c: Opcode("BIT 7,H", 2, 8, self.cb_bit_7_h),
             0xcb11: Opcode("RL C", 2, 8, self.cb_rl_c)
-
         }
+
+    def process(self):
+        bindata = self.memory.bios
+        done = False
+        while not done:
+            op = bindata[self.register.PC]
+            if op == 0xcb:
+                op = 0xcb00 + bindata[self.register.PC + 1]
+            print(self.codes[op].name)
+            print(hex(self.register.PC))
+            self.register.PC += self.codes[op].length
+            if self.register.PC == len(bindata) - 1:
+                done = True
 
     def nop(self):
         pass
@@ -119,26 +147,27 @@ class Cpu():
     def ld_hl_m_a(self):
         self.memory.write(self.register.HL, self.register.A)
 
-    def jr_nz_r8(self):
-        pass
+    def jr_nz_r8(self, bindata):
+        if self.register.flag["Z"] == 0:
+            self.register.PC = (self.register.PC + bindata[self.register.PC + 1]) & 0xff
 
     def ld_c_d8(self, location):
         self.register.C = self.memory.read(location)[0]
 
-    def ld_a_d8(self):
-        pass
+    def ld_a_d8(self, value):
+        self.register.A = value
 
     def ld_c_a(self):
-        pass
+        self.memory.write(0xff00 + self.register.C, self.register.A)
 
     def inc_c(self):
         self.register.C += 1
 
     def ld_hl_a(self):
-        pass
+        self.memory.write(self.register.HL, self.register.A)
 
-    def ldh_a8_a(self):
-        pass
+    def ldh_a8_a(self, value):
+        self.memory.write(0xff00 + value, self.register.A)
 
     def ld_de_d16(self, location):
         self.register.DE = self.memory.read(location)[0:2]
@@ -248,7 +277,8 @@ class Cpu():
 
 
     def cb_bit_7_h(self):
-        pass
+        if bin(self.register.HL)[3] == '1':
+            self.register.flag["Z"] = 1
 
     def cb_rl_c(self):
         pass
