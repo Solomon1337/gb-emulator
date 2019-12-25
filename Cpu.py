@@ -107,17 +107,17 @@ class Cpu():
     def nop(self):
         pass
 
-    def ld_sp_d16(self):
-        pass
+    def ld_sp_d16(self, value):
+        self.register.SP = value
     
     def xor_a(self):
-        pass
+        self.register.A = 0x00
 
-    def ld_hl_d16(self):
-        pass
+    def ld_hl_d16(self, value):
+        self.register.HL = value
     
     def ld_hl_m_a(self):
-        pass
+        self.memory.write(self.register.HL, self.register.A)
 
     def jr_nz_r8(self):
         pass
