@@ -3,24 +3,24 @@ from Memory import Memory
 
 class Registers():
     def __init__(self):
-        self.A = 0x0000
-        self.B = 0x0000
-        self.C = 0x0000
-        self.D = 0x0000
-        self.E = 0x0000
-        self.H = 0x0000
-        self.L = 0x0000
+        self.A = 0x00
+        self.B = 0x00
+        self.C = 0x00
+        self.D = 0x00
+        self.E = 0x00
+        self.H = 0x00
+        self.L = 0x00
 
-        self.AF = 0x0000
-        self.BC = 0x0000
-        self.DE = 0x0000
-        self.HL = 0x0000
+        # self.AF = 0x0000
+        # self.BC = 0x0000
+        # self.DE = 0x0000
+        # self.HL = 0x0000
 
         self.SP = 0x0000
         self.PC = 0x0000
 
         self.flag = {
-            "Z": 0,
+            "Z": 1,
             "N": 0,
             "H": 0,
             "C": 0
@@ -120,87 +120,109 @@ class Cpu():
         }
 
     def process(self):
-        bindata = self.memory.bios
+        self.memory.load_bios_rom()
         done = False
         while not done:
-            op = bindata[self.register.PC]
+            op = self.memory.mem[self.register.PC]
             if op == 0xcb:
-                op = 0xcb00 + bindata[self.register.PC + 1]
+                op = 0xcb00 + self.memory.mem[self.register.PC + 1]
             print(self.codes[op].name)
             print(hex(self.register.PC))
             self.register.PC += self.codes[op].length
-            if self.register.PC == len(bindata) - 1:
-                done = True
+            if self.register.PC <= len(self.memory.mem):
+                self.register.PC &= 0xffff
 
     def nop(self):
         pass
 
-    def ld_sp_d16(self, value):
-        self.register.SP = value
+    def ld_sp_d16(self):
+        self.register.SP = self.memory.mem[self.register.PC + 2] << 8 + self.memory.mem[self.register.PC + 1]
     
     def xor_a(self):
-        self.register.A = 0x00
+        self.register.A ^= self.register.A
 
-    def ld_hl_d16(self, value):
-        self.register.HL = value
+    def ld_hl_d16(self):
+        self.register.H = self.memory.mem[self.register.PC + 2]
+        self.register.L = self.memory.mem[self.register.PC + 1]
     
     def ld_hl_m_a(self):
-        self.memory.write(self.register.HL, self.register.A)
+        tmp = self.register.H << 8 + self.register.L
+        self.memory.mem[tmp] = self.register.A
+        tmp -= 1
+        self.register.H = tmp >> 8
+        self.register.L = tmp & 0xff
 
-    def jr_nz_r8(self, bindata):
-        if self.register.flag["Z"] == 0:
-            self.register.PC = (self.register.PC + bindata[self.register.PC + 1]) & 0xff
+    def jr_nz_r8(self):
+        if self.register.flag["Z"] != 0:
+            self.register.flag["Z"] = 0
+            self.register.PC = (self.register.PC + self.memory.mem[self.register.PC + 1]) & 0xff
 
-    def ld_c_d8(self, location):
-        self.register.C = self.memory.read(location)[0]
+    def ld_c_d8(self):
+        self.register.C = self.memory.mem[self.register.PC + 1]
 
-    def ld_a_d8(self, value):
-        self.register.A = value
+    def ld_a_d8(self):
+        self.register.A = self.memory.mem[self.register.PC + 1]
 
     def ld_c_a(self):
-        self.memory.write(0xff00 + self.register.C, self.register.A)
+        self.memory.mem[0xff00 + self.register.C] = self.register.A
 
     def inc_c(self):
-        self.register.C += 1
+        self.register.C = (self.register.C + 1) & 0xff
 
     def ld_hl_a(self):
-        self.memory.write(self.register.HL, self.register.A)
+        self.memory.mem[self.register.HL] = self.register.A
 
-    def ldh_a8_a(self, value):
-        self.memory.write(0xff00 + value, self.register.A)
+    def ldh_a8_a(self):
+        self.memory.mem[0xff00 + self.memory.mem[self.register.PC + 1]] = self.register.A
 
-    def ld_de_d16(self, location):
-        self.register.DE = self.memory.read(location)[0:2]
+    def ld_de_d16(self):
+        self.register.D = self.memory.mem[self.register.PC + 2]
+        self.register.E = self.memory.mem[self.register.PC + 1]
 
     def ld_a_de(self):
-        self.register.A = self.memory.read(self.register.DE)[0]
+        tmp = self.memory.mem[self.register.D] << 8 + self.memory.mem[self.register.E]
+        self.register.A = self.memory.mem[tmp]
 
     def call_a16(self):
-        pass
+        self.stack.push(self.register.PC)
+        tmp = self.memory.mem[self.register.PC + 2] << 8 + self.memory.mem[self.register.PC + 1]
+        self.register.PC = self.memory.mem[tmp]
 
     def inc_de(self):
-        self.register.DE += 1
+        tmp = self.register.D << 8 + self.register.E
+        tmp = (tmp + 1) & 0xffff
+        self.register.D = tmp >> 8
+        self.register.E = tmp & 0xff
 
     def ld_a_e(self):
-        pass
+        self.register.A = self.register.E
 
     def cp_d8(self):
-        pass
+        if self.memory.mem[self.register.PC + 1] == self.register.A:
+            self.register.flag["Z"] = 1
 
-    def ld_b_d8(self, location):
-        self.register.B = self.memory.read(location)[0]
+    def ld_b_d8(self):
+        self.register.B = self.memory.mem[self.register.PC + 1]
 
     def ld_hl_p_a(self):
-        pass
+        tmp = self.register.H << 8 + self.register.L
+        self.memory.mem[tmp] = self.register.A
+        tmp = (tmp + 1) & 0xffff
+        self.register.H = tmp >> 8
+        self.register.L = tmp & 0xff
 
     def inc_hl(self):
-        self.register.HL += 1
+        tmp = self.register.H << 8 + self.register.L
+        tmp = (tmp + 1) & 0xffff
+        self.register.H = tmp >> 8
+        self.register.L = tmp & 0xff
 
     def dec_b(self):
         self.register.B -= 1
 
     def ld_a16_a(self):
-        pass
+        tmp = self.memory.mem[self.register.PC + 2] << 8 + self.memory.mem[self.register.PC + 1]
+        self.memory.mem[tmp] = self.register.A
 
     def dec_a(self):
         self.register.A -= 1
@@ -209,25 +231,25 @@ class Cpu():
         self.register.C -= 1
 
     def ld_l_d8(self):
-        pass
+        self.register.L = self.memory.mem[self.register.PC + 1]
 
     def jr_r8(self):
-        pass
+        self.register.PC = self.memory.mem[self.register.PC + 1]
 
     def ld_h_a(self):
-        pass
+        self.register.H = self.register.A
 
     def ld_d_a(self):
-        pass
+        self.register.D = self.register.A
 
     def inc_b(self):
-        self.register.B += 1
+        self.register.B = (self.register.B + 1) & 0xff
 
     def ld_e_d8(self):
-        pass
+        self.register.E = self.memory.mem[self.register.PC + 1]
     
     def ldh_a_a8(self):
-        pass
+        self.register.A = self.memory.mem[0xFF00 + self.memory.mem[self.register.PC + 1]]
 
     def dec_e(self):
         self.register.E -= 1
@@ -236,50 +258,61 @@ class Cpu():
         self.register.H += 1
 
     def ld_a_h(self):
-        pass
+        self.register.A = self.register.H
 
     def jr_z_r8(self):
-        pass
+        if self.register.flag["Z"] == 0:
+            self.register.PC = (self.register.PC + self.memory.mem[self.register.PC + 1]) & 0xff
 
     def sub_b(self):
-        pass
+        tmp = self.register.A - self.register.B
+        if tmp == 0:
+            self.register.flag["Z"] = 1
 
     def dec_d(self):
         self.register.D -= 1
 
-    def ld_d_d8(self, location):
-        self.register.D = self.memory.read(location)[0]
+    def ld_d_d8(self):
+        self.register.D = self.memory.mem[self.register.PC + 1]
 
     def push_bc(self):
         self.stack.push(self.register.BC)
 
     def rla(self):
-        pass
+        tmp = self.register.flag["C"]
+        self.register.flag["C"] = bin(self.register.A)[2]
+        self.register.A = (self.register.A << 1) & (0xfe + tmp)
 
     def pop_bc(self):
         self.register.BC = self.stack.pop()
 
     def ret(self):
+        self.register.PC = self.stack.pop()
         pass
 
     def cp_hl(self):
-        pass
+        tmp = self.register.H << 8 + self.register.L
+        if self.register.A == self.memory.mem[tmp]:
+            self.register.flag["Z"] = 1
 
     def ld_a_l(self):
-        pass
+        self.register.A = self.register.L
 
     def ld_a_b(self):
-        pass
+        self.register.A = self.register.B
 
     def add_a_hl(self):
-        pass
+        tmp = self.register.H << 8 + self.register.L
+        self.register.A += self.memory.mem[tmp]
 
 
 
     def cb_bit_7_h(self):
-        if bin(self.register.HL)[3] == '1':
-            self.register.flag["Z"] = 1
+        if bin(self.register.HL)[2] != '1':
+            self.register.flag["Z"] = 0
 
     def cb_rl_c(self):
-        pass
+        tmp = self.register.flag["C"]
+        self.register.flag["C"] = bin(self.register.C)[2]
+        self.register.C = (self.register.C << 1) & (0xfe + tmp)
     
