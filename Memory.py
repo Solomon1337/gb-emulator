@@ -33,11 +33,32 @@ class Memory():
             0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20,
             0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50]
 
+    logo = []
+
 
 
     def __init__(self):
         # self.mem = bytearray(0xffff)
         self.mem = [0]*0xffff
+
+    def print_bios(self):
+        print(self.mem[0:0x100])
+
+    def print_rombank_0(self):
+        print(self.mem[0:0x4000])
+
+    def print_IO(self):
+        self.print_ram(self.mem[0xff00:0xffff])
+
+    def print_ram(self, ram):
+        c = 0
+        for i in ram:
+            print(str(i).rjust(3), end=" ")
+            c += 1
+            if c == 16:
+                c = 0
+                print("\n")
+        print("\n")
 
     def load_bios_rom(self):
         self.mem[0:0x100] = Memory.bios

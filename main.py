@@ -5,13 +5,8 @@ from Cpu import Cpu
 
 
 def main():
-    # romfile = sys.argv[1]
-    # read_file(romfile)
-    # rom = Rom.Rom(bindata)
-    # print(rom.get_title())
-    # bindata = Memory().bios
-    
-    cpu = Cpu()
+    cartridge = read_file(sys.argv[1])
+    cpu = Cpu(cartridge)
     cpu.process()
 
 
