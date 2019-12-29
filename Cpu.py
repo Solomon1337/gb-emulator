@@ -1,5 +1,8 @@
 from Memory import Memory
+from Graphic import Graphic
 from Gpu import Gpu
+
+import time
 
 
 class Registers():
@@ -71,6 +74,7 @@ class Cpu():
         self.cartridge = cartridge
         self.register = Registers()
         self.stack = Stack()
+        self.g = Graphic(160, 144)
         self.memory = Memory()
         self.gpu = Gpu(self.memory)
         self.codes = {
@@ -134,6 +138,7 @@ class Cpu():
         }
 
     def process(self):
+        self.g.show()
         self.memory.load_rom_bank_0(self.cartridge)
         self.memory.load_bios_rom()
         done = False
@@ -157,8 +162,11 @@ class Cpu():
             self.memory.mem[0xff50] = 0x0
 
     def nop(self):
-        print(self.memory.mem[0x8000:0x819e])
-        pass
+        # self.memory.print_ram(self.memory.mem[0x9800:0x9bff])
+        # print(self.memory.mem[0x8000:0x82ff])
+        while True:
+            continue
+        exit()
 
     def ld_sp_d16(self):
         self.register.SP = (self.memory.mem[self.register.PC + 2] << 8) + self.memory.mem[self.register.PC + 1]
@@ -230,7 +238,7 @@ class Cpu():
 
     def ld_hl_p_a(self):
         tmp = (self.register.H << 8) + self.register.L
-        print("LOADING: ", hex(self.register.A), " INTO ", hex(tmp))
+        # print("LOADING: ", hex(self.register.A), " INTO ", hex(tmp))
         self.memory.mem[tmp] = self.register.A
         tmp = (tmp + 1) & 0xffff
         self.register.H = tmp >> 8
@@ -372,6 +380,8 @@ class Cpu():
 
     def add_a_hl(self):
         tmp = (self.register.H << 8) + self.register.L
+        # print(self.register.A)
+        # print(self.memory.mem[tmp])
         self.register.A += self.memory.mem[tmp]
 
 

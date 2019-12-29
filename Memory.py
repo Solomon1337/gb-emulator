@@ -1,6 +1,8 @@
+import numpy as np
+
 
 class Memory():
-    bios = [0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32,
+    bios = np.array([0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32,
             0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
             0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3,
             0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
@@ -31,14 +33,11 @@ class Memory():
             0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13,
             0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
             0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20,
-            0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50]
-
-    logo = []
-
+            0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50], dtype=np.uint8)
 
 
     def __init__(self):
-        # self.mem = bytearray(0xffff)
+        # self.mem = np.zeros(0xffff, dtype=np.uint8)
         self.mem = [0]*0xffff
 
     def print_bios(self):
@@ -64,21 +63,24 @@ class Memory():
         self.mem[0:0x100] = Memory.bios
 
     def load_rom_bank_0(self, bank):
-        self.mem[0:0x4000] = bank
+        self.mem[0:0x8000] = bank
 
     def load_rom_bank_n(self, bank):
         self.mem[0x4000:0x8000] = bank
 
-#   def read(self, location):
-#       if location > 0xffff or location < 0x0000:
-#           raise Exception("location " + location + " out of range!")
-#       return self.mem[location], self.mem[location + 1]
+    def get_character_ram(self):
+        return self.mem[0x8000:0x97ff]
 
-#   def write(self, location, value, value2=0x00, value3=0x00):
-#       if location > 0xffff or location < 0x0000:
-#           raise Exception("location " + location + " out of range!")
-#       self.mem[location] = value
-#       if value2 != 0:
-#           self.mem[location + 1] = value2
-#       if value3 != 0:
-#           self.mem[location + 1] = value3
+    def draw_bg(self):
+        tilemap = self.get_bg_tile_map()
+        tilemap = self.convert_to_bits(tilemap)
+
+    def get_bg_tile_map(self):
+        tmp = []
+        map = self.mem[0x9800:0x9bff]
+        for i in range(0, len(map), 32):
+            tmp.append(list(map[i:i+31]))
+        return tmp
+
+    def convert_to_bits(self, tiles):
+        pass
