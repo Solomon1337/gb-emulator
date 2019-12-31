@@ -61,16 +61,11 @@ class Stack():
         return self.stack.pop()
 
 
-class Opcode():
-    def __init__(self, name, length, cycles, function):
-        self.name = name
-        self.length = length
-        self.cycles = cycles
-        self.function = function
-
-
 class Cpu():
     def __init__(self, cartridge):
+        self.screen_cycles = int((4.194304*1e6 / 59.7) / 144)
+        self.done = False
+        self.all_cycles = 0
         self.cartridge = cartridge
         self.register = Registers()
         self.stack = Stack()
@@ -78,83 +73,90 @@ class Cpu():
         self.memory = Memory()
         self.gpu = Gpu(self.memory)
         self.codes = {
-            0x00: Opcode("NOP", 1, 4, self.nop),
+            0x00: ("NOP", 1, 4, self.nop),
+            0x06: ("LD B,d8", 2, 8, self.ld_b_d8),
+            0x0e: ("LD C,d8", 2, 8, self.ld_c_d8),
+            0x11: ("LD DE,d16", 3, 12, self.ld_de_d16),
+            0x16: ("LD D,d8", 2, 8, self.ld_d_d8),
+            0x1a: ("LD A,(DE)", 1, 8, self.ld_a_de),
+            0x1e: ("LD E,d8", 2, 8, self.ld_e_d8),
+            0x21: ("LD HL,d16", 3, 12, self.ld_hl_d16),
+            0x22: ("LD (HL+),A", 1, 8, self.ld_hl_p_a),
+            0x2e: ("LD L,d8", 2, 8, self.ld_l_d8),
+            0x31: ("LD SP,d16", 3, 12, self.ld_sp_d16),
+            0x32: ("LD (HL-),A", 1, 8, self.ld_hl_m_a),
+            0x3e: ("LD A,d8", 2, 8, self.ld_a_d8),
+            0x4f: ("LD C,A", 1, 4, self.ld_c_a),
+            0x57: ("LD D,A", 1, 4, self.ld_d_a),
+            0x67: ("LD H,A", 1, 4, self.ld_h_a),
+            0x77: ("LD (HL),A", 1, 8, self.ld_hl_a),
+            0x78: ("LD A,B", 1, 4, self.ld_a_b),
+            0x7b: ("LD A,E", 1, 4, self.ld_a_e),
+            0x7c: ("LD A,H", 1, 4, self.ld_a_h),
+            0x7d: ("LD A,L", 1, 4, self.ld_a_l),
+            0xe2: ("LD (C),A", 1, 8, self.ld_c_a),
+            0xea: ("LD (a16),A", 3, 16, self.ld_a16_a),
+            0xe0: ("LDH (a8),A", 2, 12, self.ldh_a8_a),
+            0xf0: ("LDH A,(a8)", 2, 12, self.ldh_a_a8),
 
-            0x06: Opcode("LD B,d8", 2, 8, self.ld_b_d8),
-            0x0e: Opcode("LD C,d8", 2, 8, self.ld_c_d8),
-            0x11: Opcode("LD DE,d16", 3, 12, self.ld_de_d16),
-            0x16: Opcode("LD D,d8", 2, 8, self.ld_d_d8),
-            0x1a: Opcode("LD A,(DE)", 1, 8, self.ld_a_de),
-            0x1e: Opcode("LD E,d8", 2, 8, self.ld_e_d8),
-            0x21: Opcode("LD HL,d16", 3, 12, self.ld_hl_d16),
-            0x22: Opcode("LD (HL+),A", 1, 8, self.ld_hl_p_a),
-            0x2e: Opcode("LD L,d8", 2, 8, self.ld_l_d8),
-            0x31: Opcode("LD SP,d16", 3, 12, self.ld_sp_d16),
-            0x32: Opcode("LD (HL-),A", 1, 8, self.ld_hl_m_a),
-            0x3e: Opcode("LD A,d8", 2, 8, self.ld_a_d8),
-            0x4f: Opcode("LD C,A", 1, 4, self.ld_c_a),
-            0x57: Opcode("LD D,A", 1, 4, self.ld_d_a),
-            0x67: Opcode("LD H,A", 1, 4, self.ld_h_a),
-            0x77: Opcode("LD (HL),A", 1, 8, self.ld_hl_a),
-            0x78: Opcode("LD A,B", 1, 4, self.ld_a_b),
-            0x7b: Opcode("LD A,E", 1, 4, self.ld_a_e),
-            0x7c: Opcode("LD A,H", 1, 4, self.ld_a_h),
-            0x7d: Opcode("LD A,L", 1, 4, self.ld_a_l),
-            0xe2: Opcode("LD (C),A", 1, 8, self.ld_c_a),
-            0xea: Opcode("LD (a16),A", 3, 16, self.ld_a16_a),
-            0xe0: Opcode("LDH (a8),A", 2, 12, self.ldh_a8_a),
-            0xf0: Opcode("LDH A,(a8)", 2, 12, self.ldh_a_a8),
+            0x04: ("INC B", 1, 4, self.inc_b),
+            0x0c: ("INC C", 1, 4, self.inc_c),
+            0x13: ("INC DE", 1, 8, self.inc_de),
+            0x23: ("INC HL", 1, 8, self.inc_hl),
+            0x24: ("INC H", 1, 4, self.inc_h),
 
-            0x04: Opcode("INC B", 1, 4, self.inc_b),
-            0x0c: Opcode("INC C", 1, 4, self.inc_c),
-            0x13: Opcode("INC DE", 1, 8, self.inc_de),
-            0x23: Opcode("INC HL", 1, 8, self.inc_hl),
-            0x24: Opcode("INC H", 1, 4, self.inc_h),
+            0x05: ("DEC B", 1, 4, self.dec_b),
+            0x0d: ("DEC C", 1, 4, self.dec_c),
+            0x15: ("DEC D", 1, 4, self.dec_d),
+            0x1d: ("DEC E", 1, 4, self.dec_e),
+            0x3d: ("DEC A", 1, 4, self.dec_a),
 
-            0x05: Opcode("DEC B", 1, 4, self.dec_b),
-            0x0d: Opcode("DEC C", 1, 4, self.dec_c),
-            0x15: Opcode("DEC D", 1, 4, self.dec_d),
-            0x1d: Opcode("DEC E", 1, 4, self.dec_e),
-            0x3d: Opcode("DEC A", 1, 4, self.dec_a),
+            0x18: ("JR r8", 2, 12, self.jr_r8),
+            0x20: ("JR NZ,r8", 2, 12, self.jr_nz_r8),
+            0x28: ("JR Z,r8", 2, 12, self.jr_z_r8),
 
-            0x18: Opcode("JR r8", 2, 12, self.jr_r8),
-            0x20: Opcode("JR NZ,r8", 2, 12, self.jr_nz_r8),
-            0x28: Opcode("JR Z,r8", 2, 12, self.jr_z_r8),
-
-            0x17: Opcode("RLA", 1, 4, self.rla),
-            0x86: Opcode("ADD A,(HL)", 1, 8, self.add_a_hl),
-            0x90: Opcode("SUB B", 1, 4, self.sub_b),
-            0xaf: Opcode("XOR A", 1, 4, self.xor_a),
-            0xbe: Opcode("CP (HL)", 1, 8, self.cp_hl),
-            0xc1: Opcode("POP BC", 1, 12, self.pop_bc),
-            0xc5: Opcode("PUSH BC", 1, 16, self.push_bc),
-            0xc9: Opcode("RET", 1, 16, self.ret),
-            0xcd: Opcode("CALL a16", 3, 24, self.call_a16),
-            0xfe: Opcode("CP d8", 2, 8, self.cp_d8),
+            0x17: ("RLA", 1, 4, self.rla),
+            0x86: ("ADD A,(HL)", 1, 8, self.add_a_hl),
+            0x90: ("SUB B", 1, 4, self.sub_b),
+            0xaf: ("XOR A", 1, 4, self.xor_a),
+            0xbe: ("CP (HL)", 1, 8, self.cp_hl),
+            0xc1: ("POP BC", 1, 12, self.pop_bc),
+            0xc5: ("PUSH BC", 1, 16, self.push_bc),
+            0xc9: ("RET", 1, 16, self.ret),
+            0xcd: ("CALL a16", 3, 24, self.call_a16),
+            0xfe: ("CP d8", 2, 8, self.cp_d8),
             
 
-            0xcb7c: Opcode("BIT 7,H", 2, 8, self.cb_bit_7_h),
-            0xcb11: Opcode("RL C", 2, 8, self.cb_rl_c)
+            0xcb7c: ("BIT 7,H", 2, 8, self.cb_bit_7_h),
+            0xcb11: ("RL C", 2, 8, self.cb_rl_c)
         }
 
     def process(self):
         self.g.show()
         self.memory.load_rom_bank_0(self.cartridge)
         self.memory.load_bios_rom()
-        done = False
-        while not done:
-            self.check_flags()
+        start1 = time.time()
+        cycles = 0
+        while not self.done:
+            # self.check_flags()
             op = self.memory.mem[self.register.PC]
             if op == 0xcb:
                 op = 0xcb00 + self.memory.mem[self.register.PC + 1]
-            self.codes[op].function()
-            self.gpu.step(self.codes[op].cycles)
-            # print(self.codes[op].name + " : " + hex(op))
-            # print(hex(self.register.PC))
-            if "call" not in self.codes[op].name.lower():
-                self.register.PC += self.codes[op].length
-            if self.register.PC <= len(self.memory.mem):
+            op = self.codes[op]
+            op[3]()
+            self.all_cycles += op[2]
+            cycles += op[2] / 4
+            if cycles > 456:
+                cycles %= 456
+                self.gpu.step(op[2])
+            if "call" not in op[0].lower():
+                self.register.PC += op[1]
+            if self.register.PC > 0xff:
+                self.done = True
+            if self.register.PC >= len(self.memory.mem):
                 self.register.PC &= 0xffff
+        end = time.time()
+        print("TIME USED FOR ", self.all_cycles, " CYCLES: ", end-start1)
 
     def check_flags(self):
         if self.memory.mem[0xff50] == 0x01:
@@ -164,15 +166,16 @@ class Cpu():
     def nop(self):
         # self.memory.print_ram(self.memory.mem[0x9800:0x9bff])
         # print(self.memory.mem[0x8000:0x82ff])
-        while True:
-            continue
-        exit()
+        # while True:
+        #     continue
+        self.done = True
 
     def ld_sp_d16(self):
         self.register.SP = (self.memory.mem[self.register.PC + 2] << 8) + self.memory.mem[self.register.PC + 1]
     
     def xor_a(self):
-        self.register.A ^= self.register.A
+        self.register.A = 0x0
+        self.register.flag["Z"] = 1
 
     def ld_hl_d16(self):
         self.register.H = self.memory.mem[self.register.PC + 2]
@@ -202,7 +205,9 @@ class Cpu():
         self.memory.mem[0xff00 + self.register.C] = self.register.A
 
     def inc_c(self):
+        if (self.register.C & 0xf) == 0b1111: self.register.flag["H"] = 1
         self.register.C = (self.register.C + 1) & 0xff
+        if self.register.C == 0: self.register.flag["Z"] = 1
 
     def ld_hl_a(self):
         tmp = (self.register.H << 8) + self.register.L
@@ -251,7 +256,10 @@ class Cpu():
         self.register.L = tmp & 0xff
 
     def dec_b(self):
+        if (self.register.B % 0xf) == 0b0000: self.register.flag["H"] = 1
         self.register.B -= 1
+        if self.register.B < 0:
+            self.register.B = 255
         if self.register.B == 0:
             self.register.flag["Z"] = 1
         else:
@@ -262,14 +270,20 @@ class Cpu():
         self.memory.mem[tmp] = self.register.A
 
     def dec_a(self):
+        if (self.register.A % 0xf) == 0b0000: self.register.flag["H"] = 1
         self.register.A -= 1
+        if self.register.A < 0:
+            self.register.A = 0xff
         if self.register.A == 0:
             self.register.flag["Z"] = 1
         else:
             self.register.flag["Z"] = 0
 
     def dec_c(self):
+        if (self.register.C % 0xf) == 0b0000: self.register.flag["H"] = 1
         self.register.C -= 1
+        if self.register.C < 0:
+            self.register.C = 255
         if self.register.C == 0:
             self.register.flag["Z"] = 1
         else:
@@ -288,7 +302,9 @@ class Cpu():
         self.register.D = self.register.A
 
     def inc_b(self):
+        if (self.register.B & 0xf) == 0b1111: self.register.flag["H"] = 1
         self.register.B = (self.register.B + 1) & 0xff
+        if self.register.B == 0: self.register.flag["Z"] = 1
 
     def ld_e_d8(self):
         self.register.E = self.memory.mem[self.register.PC + 1]
@@ -297,14 +313,19 @@ class Cpu():
         self.register.A = self.memory.mem[0xFF00 + self.memory.mem[self.register.PC + 1]]
 
     def dec_e(self):
+        if (self.register.E % 0xf) == 0b0000: self.register.flag["H"] = 1
         self.register.E -= 1
+        if self.register.E < 0:
+            self.register.E = 0xff
         if self.register.E == 0:
             self.register.flag["Z"] = 1
         else:
             self.register.flag["Z"] = 0
 
     def inc_h(self):
-        self.register.H += 1
+        if (self.register.H & 0xf) == 0b1111: self.register.flag["H"] = 1
+        self.register.H = (self.register.H + 1) & 0xff
+        if self.register.H == 0: self.register.flag["Z"] = 1
 
     def ld_a_h(self):
         self.register.A = self.register.H
@@ -314,14 +335,17 @@ class Cpu():
             self.register.PC = (self.register.PC + self.memory.mem[self.register.PC + 1]) & 0xff
 
     def sub_b(self):
-        tmp = self.register.A - self.register.B
-        if tmp == 0:
+        self.register.A = (self.register.A - self.register.B) % 0x100
+        if self.register.A == 0:
             self.register.flag["Z"] = 1
         else:
             self.register.flag["Z"] = 0
 
     def dec_d(self):
+        if (self.register.D % 0xf) == 0b0000: self.register.flag["H"] = 1
         self.register.D -= 1
+        if self.register.D < 0:
+            self.register.D = 255
         if self.register.D == 0:
             self.register.flag["Z"] = 1
         else:
@@ -335,8 +359,10 @@ class Cpu():
         self.stack.push(tmp)
 
     def rla(self):
-        lastbit = int(format(self.register.A, '#010b')[2])
-        self.register.A = ((self.register.A << 1) & 0xfe) + lastbit
+        self.register.flag["C"] = (self.register.A & (1<<7)) >> 7
+        self.register.A <<= 1
+        self.register.A |= self.register.flag["C"]
+        self.register.flag["Z"] = self.register.A == 0
 
     def pop_bc(self):
         tmp = self.stack.pop()
@@ -348,29 +374,25 @@ class Cpu():
         pass
 
     def cp_d8(self):
-        val = self.memory.mem[self.register.PC + 1]
-        if val > self.register.A:
+        result = (self.register.A - self.memory.mem[self.register.PC + 1]) & 0xff
+        if result == 0:
+            self.register.flag["Z"] = 1
+        else:
+            self.register.flag["Z"] = 0
+        if self.register.A < result:
             self.register.flag["C"] = 1
         else:
             self.register.flag["C"] = 0
 
-#        if ((self.register.A & 0xF) > (val & 0xF)):
-#            self.register.flag["H"] = 1
-#        else:
-#            self.register.flag["H"] = 0
-
-        if val == self.register.A:
-            self.register.flag["Z"] = 1
-        else:
-            self.register.flag["Z"] = 0
-
     def cp_hl(self):
         tmp = (self.register.H << 8) + self.register.L
         # print("Comparing: ", str(hex(self.register.A)) + "==" + str(hex(self.memory.mem[tmp])))
-        if self.register.A == self.memory.mem[tmp]:
+        result = (self.register.A - self.memory.mem[tmp]) % 0x100
+        if result == 0:
             self.register.flag["Z"] = 1
         else:
             self.register.flag["Z"] = 0
+        if self.register.A < result: self.register.flag["C"] = 1
 
     def ld_a_l(self):
         self.register.A = self.register.L
@@ -380,10 +402,8 @@ class Cpu():
 
     def add_a_hl(self):
         tmp = (self.register.H << 8) + self.register.L
-        # print(self.register.A)
-        # print(self.memory.mem[tmp])
-        self.register.A += self.memory.mem[tmp]
-
+        self.register.A = (self.register.A + self.memory.mem[tmp]) & 0xff
+        if self.register.A == 0: self.register.flag["Z"] = 1
 
 
     def cb_bit_7_h(self):

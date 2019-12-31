@@ -1,6 +1,5 @@
 from Graphic import Graphic
 import time
-import numpy as np
 
 
 class Gpu():
@@ -41,16 +40,18 @@ class Gpu():
         self.lcdc = 0
         self.cycles = 0
         self.seconds = 0
+        self.tile_offset = 0
         self.memory = memory
+        self.set_tile_offset()
 
         self.window = Graphic()
-        self.tile_window = Graphic(height=128)
+        # self.tile_window = Graphic(height=128)
         self.window.show()
         self.window.clear(0x474741)
-        self.tile_window.clear(0x474741)
+        # self.tile_window.clear(0x474741)
 
         self.window.update()
-        self.tile_window.update()
+        # self.tile_window.update()
 
         self.palette = {
             0: 0xffffff,
@@ -60,35 +61,19 @@ class Gpu():
         }
 
         self.pixels = {0: [], 1: [], 2: [], 3: []}
-        self.tile_pixels = {0: [], 1: [], 2: [], 3: []}
+        # self.tile_pixels = {0: [], 1: [], 2: [], 3: []}
 
     def step(self, cycles):
-        self.cycles += (cycles / 4)
-        if self.cycles > 70224:
-            self.draw_bg()
-            self.cycles -= 70224
-            self.line = 0
-            self.seconds += 1
-            if self.cycles == 60:
-                print("FULL SECOND!!!")
-
-        currline = self.cycles // 456
-        if currline <= 144:
-            if currline != self.line:
-                self.line = currline
-                self.write_ly()
-            mod = self.cycles % 456
-            if mod < 207:
-                self.mode = 0
-            elif mod < 207 + 77:
-                self.mode = 2
-            else:
-                self.mode = 3
-        else:
-            self.mode = 1
+        if self.write_ly():
+            self.render_full_background()
+            self.flush_pixels()
+            self.draw_window()
+            self.window.update()
 
     def write_ly(self):
+        self.line = (1 + self.line) % 145
         self.memory.mem[0xff44] = self.line
+        return self.line == 0
     
     def update_stat(self):
         self.memory.mem[0xff41] = self.mode
@@ -116,55 +101,115 @@ class Gpu():
         self.scrollX = self.memory.mem[0xff43]
         self.scrollY = self.memory.mem[0xff42]
 
-    def draw_bg(self):
-        lcdc = self.get_lcdc()
-        if lcdc["BGWINDOW"] == "0": return
-        if lcdc["BGTILEMAPDSP"] == "0":
-            tiles = self.memory.mem[0x9800:0x9c00]
+    def set_tile_offset(self):
+        if self.get_lcdc()["BGTILEMAPDSP"] == "0":
+            self.tile_offset = 0x9800
         else:
-            tiles = self.memory.mem[0x9c00:0xa000]
-        # tilemap = self.memory.get_bg_tile_map()
-        tilemap = self.convert_to_bits(tiles)
+            self.tile_offset = 0x9c00
+
+    def flush_pixels(self):
+        for color, positions in self.pixels.items():
+            color = self.palette[color]
+            self.window.put_pixels(positions, color)
+        self.pixels = {0: [], 1: [], 2: [], 3: []}
+
+    def draw_bg(self):
+        pass
+        # self.draw_all_tiles()
+        # self.render_line(int(self.line))
 
     def convert_to_bits(self, tiles):
         tmp = []
-        # alltiles = [list(tiles[n:n+32]) for n in range(0, len(tiles), 32)]
-        # tiles = [self.memory.mem[0x8000 + (a * 16):0x8000 + (a * 16) + 16] for a in tiles]
-        # test = [tiles[n:n+32] for n in range(0, len(tiles), 32)]
-        # t = time.time()
-        # print(tiles)
-        # t2 = time.time()
-        # print(t, t2)
-        # print(test)
-        # a = [self.memory.mem[0x8000 + (a * 16):0x8000 + (a * 16) + 16] for a in test]
-        # trans = [self.memory.mem[0x8000 + (a * 16):0x8000 + (a * 16) + 16] for a in [tiles[n:n+32] for n in range(0, len(tiles), 32)]]
-        # print(trans)
-        # for line in alltiles:
-        #     tmp.append(self.convert_tile_to_color(line))
-        return tmp
+        for i in range(0, len(tiles), 32):
+            tmp.append(tiles[i:i+32])
 
-    def convert_tile_to_color(self, line):
-        tmpline = []
-        for tile in line:
-            # if tile == 0: continue
-            # print("CIRREMT: ", tile)
-            begin = 0x8000 + (16 * tile)
-            tmp = []
-            a = self.memory.mem[begin:begin+16]
-            # print(a)
-            for i in range(8):
-                b = format(a[i], '#010b')[2:]
-                c = format(a[i+1], '#010b')[2:]
-                for cnt, bit in enumerate(b):
-                    if bit == c[cnt]:
-                        tmp.append(255)
-                    elif bit == '1' and c[cnt] == '0':
-                        tmp.append(70)
-                    elif bit == '0' and c[cnt] == '1':
-                        tmp.append(160)
-            # print(tmp)
-            # tmp = [format(a, '#010b')[2:] for a in self.memory.mem[begin:begin+16]]
-            # print(tmp)
-            tmpline.append(tmp)
-        # print("", len(tmpline), " : ", len(tmpline[0]))
-        return tmpline
+    def draw_all_tiles(self):
+        a = set(self.memory.mem[0x9800:0x9a00])
+        for i in a:
+            self.draw_tile(i)
+        # print(a)
+
+    def draw_tile(self, loc):
+        tile = self.memory.mem[0x8000+(loc*16):0x8000+(loc*16) + 16]
+        line = 0
+        for i in range(0, 16, 2):
+            a = tile[i]
+            b = tile[i+1]
+            colors = (
+                ((a & 0b10000000) >> 7) | ((b & 0b10000000) >> 6),
+                ((a & 0b01000000) >> 6) | ((b & 0b01000000) >> 5),
+                ((a & 0b00100000) >> 5) | ((b & 0b00100000) >> 4),
+                ((a & 0b00010000) >> 4) | ((b & 0b00010000) >> 3),
+                ((a & 0b00001000) >> 3) | ((b & 0b00001000) >> 2),
+                ((a & 0b00000100) >> 2) | ((b & 0b00000100) >> 1),
+                ((a & 0b00000010) >> 1) | ((b & 0b00000010)     ),
+                ((a & 0b00000001)     ) | ((b & 0b00000001) << 1))
+            line += 1
+            for n, color in enumerate(colors):
+                self.pixels[color] += [n + loc*8, line]
+
+    def render_line(self, line):
+        # Read the tile table
+        bitmap = 0x8000
+        table = self.tile_offset
+
+        # Draw one scanline from the tiles. We do this by calculating the tile
+        # index and y-position
+
+        # For the given y line, find which tile number it is when the screen is
+        # divided up in 32x32 tiles that are 8x8 pixels each.
+        ypos = line & 0b11111000
+        index_offset = ypos << 2
+
+        # Position whithin this tile
+        yoff = line - ypos
+        bitmap += yoff*2
+        x = 0
+
+        # The background consists of 32x32 tiles, so find the tile index.
+        for index in range(32):
+            tile = 16*self.memory.mem[table + index_offset + index]
+
+            a = self.memory.mem[bitmap + tile]
+            b = self.memory.mem[bitmap + tile + 1]
+
+            colors = (
+                ((a & 0b10000000) >> 7) | ((b & 0b10000000) >> 6),
+                ((a & 0b01000000) >> 6) | ((b & 0b01000000) >> 5),
+                ((a & 0b00100000) >> 5) | ((b & 0b00100000) >> 4),
+                ((a & 0b00010000) >> 4) | ((b & 0b00010000) >> 3),
+                ((a & 0b00001000) >> 3) | ((b & 0b00001000) >> 2),
+                ((a & 0b00000100) >> 2) | ((b & 0b00000100) >> 1),
+                ((a & 0b00000010) >> 1) | ((b & 0b00000010)     ),
+                ((a & 0b00000001)     ) | ((b & 0b00000001) << 1))
+
+            for n, color in enumerate(colors):
+                self.pixels[color] += [x+n, line]
+            x += 8
+
+    def render_full_background(self):
+        for line in range(32):
+            for tile in range(32):
+                loc = line * 32 + tile
+                loc = self.memory.mem[0x9800 + line * 32 + tile]
+                tiles = self.memory.mem[0x8000 + (loc * 16):0x8000 + (loc * 16) + 16]
+                lines = line * 8
+                for i in range(0, 16, 2):
+                    a = tiles[i]
+                    b = tiles[i+1]
+                    colors = (
+                        ((a & 0b10000000) >> 7) | ((b & 0b10000000) >> 6),
+                        ((a & 0b01000000) >> 6) | ((b & 0b01000000) >> 5),
+                        ((a & 0b00100000) >> 5) | ((b & 0b00100000) >> 4),
+                        ((a & 0b00010000) >> 4) | ((b & 0b00010000) >> 3),
+                        ((a & 0b00001000) >> 3) | ((b & 0b00001000) >> 2),
+                        ((a & 0b00000100) >> 2) | ((b & 0b00000100) >> 1),
+                        ((a & 0b00000010) >> 1) | ((b & 0b00000010)     ),
+                        ((a & 0b00000001)     ) | ((b & 0b00000001) << 1))
+                    lines += 1
+                    for n, color in enumerate(colors):
+                        self.pixels[color] += [n + tile*8, lines]
+
+    def draw_window(self):
+        self.set_scroll()
+        self.window.box(self.scrollX, self.scrollY, self.scrollX+144, self.scrollY+160)

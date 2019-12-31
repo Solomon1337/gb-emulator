@@ -1,8 +1,6 @@
-import numpy as np
-
 
 class Memory():
-    bios = np.array([0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32,
+    bios = [0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32,
             0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
             0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3,
             0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
@@ -33,11 +31,10 @@ class Memory():
             0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13,
             0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
             0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20,
-            0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50], dtype=np.uint8)
+            0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50]
 
 
     def __init__(self):
-        # self.mem = np.zeros(0xffff, dtype=np.uint8)
         self.mem = [0]*0xffff
 
     def print_bios(self):
@@ -48,16 +45,6 @@ class Memory():
 
     def print_IO(self):
         self.print_ram(self.mem[0xff00:0xffff])
-
-    def print_ram(self, ram):
-        c = 0
-        for i in ram:
-            print(str(i).rjust(3), end=" ")
-            c += 1
-            if c == 16:
-                c = 0
-                print("\n")
-        print("\n")
 
     def load_bios_rom(self):
         self.mem[0:0x100] = Memory.bios
@@ -71,16 +58,12 @@ class Memory():
     def get_character_ram(self):
         return self.mem[0x8000:0x97ff]
 
-    def draw_bg(self):
-        tilemap = self.get_bg_tile_map()
-        tilemap = self.convert_to_bits(tilemap)
-
-    def get_bg_tile_map(self):
-        tmp = []
-        map = self.mem[0x9800:0x9bff]
-        for i in range(0, len(map), 32):
-            tmp.append(list(map[i:i+31]))
-        return tmp
-
-    def convert_to_bits(self, tiles):
-        pass
+    def print_ram(self, ram):
+        c = 0
+        for i in ram:
+            print(str(i).rjust(3))
+            c += 1
+            if c == 16:
+                c = 0
+                print("\n")
+        print("\n")
