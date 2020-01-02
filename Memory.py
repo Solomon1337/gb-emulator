@@ -35,7 +35,7 @@ class Memory():
 
 
     def __init__(self):
-        self.mem = [0]*0xffff
+        self.mem = [0]*0x10000
 
     def print_bios(self):
         print(self.mem[0:0x100])

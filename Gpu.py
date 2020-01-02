@@ -71,7 +71,7 @@ class Gpu():
             self.window.update()
 
     def write_ly(self):
-        self.line = (1 + self.line) % 145
+        self.line = (1 + self.line) % 0x100
         self.memory.mem[0xff44] = self.line
         return self.line == 0
     
